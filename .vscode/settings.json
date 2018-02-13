@@ -1,0 +1,6 @@
+{
+  "python.linting.pylintEnabled": false,
+  "python.linting.mypyEnabled": true,
+  "python.pythonPath": "/Users/alikhil/.pyenv/versions/drop3.6/bin/python",
+  "python.linting.mypyPath": "/Users/alikhil/.pyenv/versions/drop3.6/bin/mypy"
+}
