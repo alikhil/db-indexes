@@ -1,13 +1,14 @@
 from typing import TypeVar, Generic, List
 from bisect import bisect_right
 
+KeyType = TypeVar('KeyType', int, str)
 T = TypeVar('T')
 
-PAGE_SIZE = 4
+DEGREE = 4   
 
-class SmartKey(Generic[T]):
+class SmartKey(Generic[KeyType,T]):
 
-    def __init__(self, key: int, value: T = None) -> None:
+    def __init__(self, key: KeyType, value: T = None) -> None:
         self.key = key
         self.value = value
 
@@ -115,22 +116,44 @@ class Page:
 
 
     def is_full(self) -> bool:
-        return len(self.elements) == PAGE_SIZE
+        return len(self.elements) == DEGREE
 
     def split(self) -> 'Page':
         """
             move the highest-ranking half of the keys in the page to a new page
         """
         # should create with same bottom
-        new_page_els = self.elements[PAGE_SIZE // 2:]     # last half
-        self.elements = self.elements[:PAGE_SIZE // 2]    # first half
+        new_page_els = self.elements[DEGREE // 2:]     # last half
+        self.elements = self.elements[:DEGREE // 2]    # first half
 
         new_page = Page(self.bottom)
         new_page.elements = new_page_els
         return new_page
 
+    def remove(self, key: KeyType) -> None:
+        left_upper_index = bisect_right(self.elements, KeyWrapper(SmartKey(key)))
+        if left_upper_index == 0:
+            # key not found
+            print(f"there is no such key {key}")
+            return
+        
+        ind = left_upper_index - 1
+        if self.elements[ind].key.key == key:
+            # wow we found key in childs
+            if ind == 0:
+                print(f"i don't know how to delete first key({key}) from node :( please, teach me")
+                return 
+            if self.elements[ind].link:
+                self.elements[ind].link.remove(key)
+            else:
+                if self.is_external():
+                    # when node is leaf, we can easily remove key from node
+                    self.elements.pop(ind)
+
+        pass
+
     def keys(self) -> List[SmartKey]:
-        return None
+        return map(lambda f: f.key, self.elements)
 
     def print_tree(self, deep = 0) -> None:
 
@@ -166,6 +189,9 @@ class BTree:
     def find_key(self, key: SmartKey) -> SmartKey:
         return self._find(self.root, key)
 
+    def remove(self, key: SmartKey) -> None:
+
+        self.root.remove(key.key)
 
     def _find(self, h: Page, key: SmartKey) -> SmartKey:
         if h is None:
@@ -189,9 +215,11 @@ class BTree:
         
         nxt.close()
     
+
     def print_tree(self, deep: int = 0) -> None:
         self.root.print_tree(deep)
         
+
 
 
 class NaiveTreeIndex:
