@@ -3,16 +3,158 @@ inspired by http://www.di.ufpb.br/lucidio/Btrees.pdf and https://algs4.cs.prince
 """
 
 
+from random import shuffle, randint, choice
 from typing import TypeVar, Generic, List
 from bisect import bisect_right
+
+import time
 
 KeyType = TypeVar('KeyType', int, str)
 T = TypeVar('T')
 
+# Number of keys per node/page
 DEGREE = 16   
 
-class SmartKey(Generic[KeyType,T]):
 
+
+def main():
+
+    run_function_tests()
+
+    run_performance_test()
+
+
+
+def run_function_tests():
+    """
+        This method tests if btree performs correctly
+        by running same random commands(insert,delete,find)
+        on btree and naivetree indexes. And comparing results.
+        (we assume that naivetree works correctly since it just wrapper on python 'dict')
+    """
+    print("\t### running functional testing ###")
+    btree = BTree()
+    naive = NaiveTreeIndex()
+
+    # you can tune this variables
+    iterations = 100000
+    maxint = 150000
+
+    inserts, deletions, finds = 0, 0, 0
+
+    incorrect_finds = 0
+    incorrect_deletions = 0
+
+    for i in range(iterations):
+        action = randint(1, 3)
+        if action == 1: # add
+            k, v = randint(1, maxint), randint(1, maxint)
+            naive.add_key_value(SmartKey(k,v))
+            btree.add_key_value(SmartKey(k, v))
+            inserts += 1
+        elif (action == 2 and len(naive.tree.keys()) > 0): # find
+            key = SmartKey(choice(list(naive.tree.keys())))
+            btree_res = btree.find_key(key)
+            naive_res = naive.find(key)
+            if btree_res != naive_res:
+                incorrect_finds += 1
+            finds += 1
+        elif len(naive.tree.keys()) > 0: # delete
+            key = SmartKey(choice(list(naive.tree.keys())))
+            btree.remove(key)
+            naive.remove(key)
+            if btree.find_key(key) != None:
+                incorrect_deletions += 1
+            deletions += 1
+
+    print('  ', iterations, 'iterations proceeded')
+    print('  ', incorrect_finds, 'incorrect finds from', finds)
+    print('  ', incorrect_deletions, 'incorrect deletions from', deletions)
+    if incorrect_finds + incorrect_deletions == 0:
+        print(" ✔ Functional tests passed successfully")
+    print("\t### functional testing finished ###")
+    
+
+def run_performance_test():
+
+    print("\t$$$ performance test started $$$")
+    
+    # you can tune this variables
+    n = 10000
+    maxint = 10000
+    
+    insert_time = []
+    search_time = []
+    delete_time = []
+
+    nums_k_v = [(i, randint(1, maxint)) for i in range(n)]
+    shuffle(nums_k_v)
+
+    btree = BTree()
+    naiveL = NaiveListIndex()
+
+    # measure insert
+    st = time.time()
+    for k,v in nums_k_v:    
+        naiveL.add_key_value(SmartKey(k, v))
+    et = time.time();
+    insert_time.append(et - st)
+
+
+    st = time.time()
+    for k,v in nums_k_v:
+        btree.add_key_value(SmartKey(k, v))
+
+    et = time.time();
+    insert_time.append(et - st)
+
+    cp = nums_k_v[:]
+    shuffle(cp)
+
+    # measure search
+    st = time.time()
+    for k, _ in cp:
+        naiveL.find_key(SmartKey(k))
+
+    et = time.time();
+    search_time.append(et - st)
+
+
+    st = time.time()
+    for k, _ in cp:
+        btree.find_key(SmartKey(k))
+
+    et = time.time();
+    search_time.append(et - st)
+
+    # measure deletion
+
+    st = time.time()
+    for k, _ in cp:
+        naiveL.remove(SmartKey(k))
+
+    et = time.time();
+    delete_time.append(et - st)
+
+
+    st = time.time()
+    for k, _ in cp:
+        btree.remove(SmartKey(k))
+
+    et = time.time();
+    delete_time.append(et - st)
+
+    # print results
+    print(f"btree has x{insert_time[0]/insert_time[1]} times faster insertion ")
+    print(f"btree has x{delete_time[0]/delete_time[1]} times faster deletion ")
+    print(f"btree has x{search_time[0]/search_time[1]} times faster search ")
+    print("\t$$$ performance test finished $$$")
+
+
+class SmartKey(Generic[KeyType,T]):
+    """
+
+    """
     def __init__(self, key: KeyType, value: T = None) -> None:
         self.key: KeyType = key
         self.value: List[T] = value
@@ -29,14 +171,17 @@ class SmartKey(Generic[KeyType,T]):
 
 
 class Page:
-    def __init__(self, bottom: bool) -> None:
-        self.bottom = bottom
+    """
+        Btree node
+    """
+    def __init__(self, leaf: bool) -> None:
+        self.leaf = leaf
         self.keys: List[SmartKey] = []
         self.children: List[Page] = []
 
     def add_key_value(self, key: KeyType, value: T) -> None:
 
-        wrapped_key = SmartKey(key, [value]) # store list of values in bottom nodes
+        wrapped_key = SmartKey(key, [value]) # store list of values in leaf nodes
         
         if len(self.keys) == 0:
             self.keys.append(wrapped_key)
@@ -48,7 +193,7 @@ class Page:
                 self.keys.insert(left_upper_index, wrapped_key)
 
     def is_external(self) -> bool:
-        return self.bottom
+        return self.leaf
 
     def find(self, key: SmartKey) -> List[T]:
         """Try to find key in page"""
@@ -88,14 +233,14 @@ class Page:
         """
             move the highest-ranking half of the keys in the page to a new page
         """
-        # should create with same bottom
+        # should create with same leaf
         r_key = self.keys[DEGREE - 1]
         new_page_keys = self.keys[DEGREE:]     # last half
         self.keys = self.keys[:DEGREE - 1]    # first half
         new_page_children = self.children[DEGREE:]
         self.children = self.children[:DEGREE]
 
-        new_page = Page(self.bottom)
+        new_page = Page(self.leaf)
         new_page.keys = new_page_keys
         new_page.children = new_page_children
 
@@ -163,11 +308,7 @@ class Page:
         if self.is_external(): # case 1
             if (left_upper_index > 0 and self.keys[left_upper_index - 1].key == key): 
                 self.keys.pop(left_upper_index - 1)
-            # else:
-                # print(f'no key({key}) found in external node')
             return self
-        # [10, 40]
-        # [7, 9] [15, 35, 39] [45, 49, 90]
         ind = max(left_upper_index - 1, 0)
         if self.keys[ind].key == key: # case 2
             # wow we found key in page
@@ -193,7 +334,7 @@ class Page:
                 needed_ch_ind += 1
             ch = self.children[needed_ch_ind]
             if len(ch.keys) == DEGREE - 1: # case A
-                # try to grub from right sibling
+                # try to grub from right sibling or merge 2 siblings in worst case
                 if (needed_ch_ind + 1 < len(self.children) and len(self.children[needed_ch_ind + 1].keys) > DEGREE - 1):
                     self.borrow_from_right(needed_ch_ind)
                 elif (needed_ch_ind > 0 and len(self.children[needed_ch_ind - 1].keys) > DEGREE - 1):
@@ -260,7 +401,6 @@ class BTree:
         if nxt.is_full():
             page.split_and_add_page(nxt)
         
-        nxt.close()
     
 
 class NaiveTreeIndex:
@@ -305,172 +445,13 @@ class NaiveListIndex:
                 return self.list[k]
 
         return None
+    
+    def remove(self, key: SmartKey):
+        for k, v in self.list:
+            if k == key.key:
+                self.list.remove((k, v))
         
-
-from random import shuffle, randint, choice
-import time
 
 
 if __name__ == "__main__":
-
-    if True:
-        btree = BTree()
-        naive = NaiveTreeIndex()
-
-        iterations = 100000
-        maxint = 150000
-
-        inserts, deletions, finds = 0, 0, 0
-
-        incorrect_finds = 0
-        incorrect_deletions = 0
-
-        for i in range(iterations):
-            action = randint(1, 3)
-            if action == 1: # add
-                k, v = randint(1, maxint), randint(1, maxint)
-                naive.add_key_value(SmartKey(k,v))
-                btree.add_key_value(SmartKey(k, v))
-                inserts += 1
-            elif (action == 2 and len(naive.tree.keys()) > 0): # find
-                key = SmartKey(choice(list(naive.tree.keys())))
-                btree_res = btree.find_key(key)
-                naive_res = naive.find(key)
-                if btree_res != naive_res:
-                    incorrect_finds += 1
-                finds += 1
-            elif len(naive.tree.keys()) > 0: # delete
-                key = SmartKey(choice(list(naive.tree.keys())))
-                btree.remove(key)
-                naive.remove(key)
-                if btree.find_key(key) != None:
-                    incorrect_deletions += 1
-                deletions += 1
-
-        print(iterations, 'iterations proceeded')
-        print(incorrect_finds, 'incorrect finds from', finds)
-        print(incorrect_deletions, 'incorrect deletions from', deletions)
-        exit(0)
-
-    if True:
-        nums = [13, 8, 3, 2, 5, 1, 1]
-        btree = BTree()
-        naive = NaiveTreeIndex()
-        
-        nums_k_v = [(nums[i], i) for i in range(len(nums))]
-        n = 15000
-        maxint = 15000
-        
-        nums_k_v = [(randint(1, maxint), i) for i in range(n)]
-        shuffle(nums_k_v)
-        # nums_k_v = [(8, 5), (10, 2), (7, 12), (13, 11), (9, 9), (11, 10), (11, 0), (2, 4), (11, 13), (5, 7), (8, 14), (13, 6), (5, 8), (6, 1), (14, 3)]
-        print(nums_k_v)
-
-        for k,v in nums_k_v:
-            print('adding', k, v)
-            btree.add_key_value(SmartKey(k, v))
-            # btree.print_tree()
-            naive.add_key_value(SmartKey(k, v))
-        
-        shuffle(nums_k_v)
-        delete_n = n // 2
-
-        for k,v in nums_k_v[:delete_n]:
-            print('deleting', k, v)
-            btree.remove(SmartKey(k))
-            naive.remove(SmartKey(k))
-            # btree.print_tree()
-            # print('bt', btree.find_key(SmartKey(k)) == naive.find(SmartKey(k)).value)
-            # print(k, btree.find_key(SmartKey(k)), naive.find(SmartKey(k)).value)
-        # print('nv:',)
-        cnt = 0
-        for k,v in nums_k_v:
-            v = btree.find_key(SmartKey(k)) == naive.find(SmartKey(k))
-            print('bt', v)
-            if not v:
-                cnt += 1
-            # print(k, btree.find_key(SmartKey(k)), naive.find(SmartKey(k)))
-        print('nv:', cnt)
-        exit(0)
-
-    n = 10000
-    maxint = 100
-    
-    nums_k_v = [(i, randint(1, maxint)) for i in range(n)]
-    # cp = nums[:]
-    # shuffle(nums)
-    # print("nums order is folowing:", nums) 
-
-    btree = BTree()
-    naive = NaiveTreeIndex()
-    naiveL = NaiveListIndex()
-
-    st = time.time()
-    for k,v in nums_k_v:
-        btree.add_key_value(SmartKey(k, v))
-
-    et = time.time();
-    print('btree build:', et - st)
-
-    st = time.time()
-    for k,v in nums_k_v:
-        naive.add_key_value(SmartKey(k, v))
-    et = time.time();
-    print('naive build:', et - st)
-
-    st = time.time()
-    for k,v in nums_k_v:
-        naiveL.add_key_value(SmartKey(k, v))
-    et = time.time();
-    print('naive list build:', et - st)
-
-
-
-    cp = nums_k_v[:]
-    shuffle(cp)
-
-    st = time.time()
-    for k, _ in cp:
-        naive.find(SmartKey(k))
-
-    et = time.time();
-
-
-    print('naive:', et - st)
-
-
-    st = time.time()
-    for k, _ in cp:
-        btree.find_key(SmartKey(k))
-
-
-    et = time.time();
-
-    print('btree:', et - st)
-
-    st = time.time()
-    for k, _ in cp:
-        naiveL.find_key(SmartKey(k))
-
-
-    et = time.time();
-
-    print('naive list:', et - st)
-    # cnt = 0
-    # for k, _ in cp:
-    #     s = btree.find_key(SmartKey(k))
-    #     ns = naive.find(SmartKey(k))
-    #     if not ns:
-    #         print('naive failed')
-    #         print(k)
-    #         continue
-    #     if not s:
-    #         print('btree failed')
-    #         print(k)
-    #         continue
-    #     if ns.value == s.value:
-    #         print("ok")
-    #     else:
-    #         cnt += 1
-    #         print(k, 'naive:', ns.value, 'btree:', s.value)
-    # print(cnt)
+    main()
