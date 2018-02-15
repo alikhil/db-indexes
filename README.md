@@ -1,15 +1,34 @@
-# DropSQL indexes
+# Indexes
 
-1. Why we can use only standard libs?
-2. What types should be able to indexed?
-3. What kind of operations should be supported by our indexes?
-4. Does dropsql support indexes by design?
+To see test results just run sources with `python 3.6`
 
-## Steps
+## Bitmap
 
-1. Implement b-tree, bitmap and hash indexes by inheriting `AbstractIndex` and implementing abstract methods
-2. Redesign index implementations to integrate them into dropsql
+```sh
+pip install bitarray
+```
+
+```python
+python indexes/bitmap.py
+```
+
+## Hash
+
+```python
+python indexes/hash.py
+```
+
+## BTree
+
+```python
+python indexes/btree.py
+```
 
 
-## Testing indexes
+## Sources
 
+Links to original repositories:
+
+* [Bitmap index](https://github.com/piaxar/bitmap_index)
+* [Hash index](https://github.com/Loaferchassis/hash_table)
+* [BTree index](https://github.com/alikhil/raw-indexes)
